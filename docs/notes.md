@@ -45,6 +45,11 @@ Best practices:
 - Progressive dislosure: reference specific files as need with additional context, modularize and compose skills
 - Maintain a verification skill to have an agent check its work
 
+Popular skills:
+- [Modern Web Guidance](https://github.com/googlechrome/modern-web-guidance): embed web platform expertise, best practices, and browser compatibility data into coding agents.
+- [Skills for Real Engineers](https://github.com/mattpocock/skills): general agent skills from Matt Pocock.
+- [Ponytail](https://github.com/dietrichgebert/ponytail): reduces amount of code and token usage, provides senior-dev level reviews.
+
 
 ## Customizing Agentic Setup
 
