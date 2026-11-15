@@ -9,6 +9,7 @@ Decision: Allowed but must be used carefully
 Follow conditions:
 - Make use of built-in exception classes when it makes sense. For example, raise a `ValueError` to indicate a programming mistake like a violated precondition, such as may happen when validating function arguments.
 - Do not use `assert` statements in place of conditionals or validating preconditions. They must not be critical to the application logic. A litmus test would be that the `assert` could be removed without breaking the code. `assert` conditionals are not guaranteed to be evaluated. For pytest based tests, `assert` is okay and expected to verify expectations.
+
 **Good**:
 ```py
 if minimum < 1024:
@@ -39,6 +40,7 @@ return port
 
 ## Comprehensions & Generator Expressions
 Decision: Okay to use for simple cases, but not allowed in the case of multiple `for` or `filter` clauses.
+
 **Good**:
 ```py
 result = [mapping_expr for value in iterable if filter_expr]
@@ -79,6 +81,7 @@ return (
 
 ## Default Argument Values
 Decision: Okay in most cases, but do not use mutable object as default values in the function.
+
 **Good**:
 ```py
 def foo(a, b=None):
@@ -127,7 +130,7 @@ Decision: Avoid
 
 ## Type-annotated Code
 Decision: Strongly encouraged
-Examples:
+- Examples:
 ```py
 def func(a: int) -> list[int]: # Function type hints 
 a: SomeType = some_func() # Variable type hints
@@ -255,10 +258,26 @@ a: SomeType = some_func() # Variable type hints
         - Good: `x, y = y, x`
         - Bad: `x , y = y , x`
     - Never use spaces around `=` when passing keyword arguments or defining a default parameter value, EXCEPT when a type annotation is present.
-        - Good: `def complex(real, imag=0.0): return Magic(r=real, i=imag)` (no annotation, no space)
-        - Good: `def complex(real, imag: float = 0.0): return Magic(r=real, i=imag)` (spacing type annotation present)
-        - Bad: `def complex(real, imag = 0.0): return Magic(r = real, i = imag)` (spacing with no type anno.)
-        - Bad: `def complex(real, imag: float=0.0): return Magic(r = real, i = imag)` (no spacing with type anno.)
+        - Good: 
+        ```py 
+        # No annotation, no space
+        def complex(real, imag=0.0): return Magic(r=real, i=imag) 
+        ```
+        - Good: 
+        ```py 
+        # Has spacing when type annotation present
+        def complex(real, imag: float = 0.0): return Magic(r=real, i=imag)
+        ```
+        - Bad: 
+        ```py 
+        # Has spacing with no type annotation
+        def complex(real, imag = 0.0): return Magic(r = real, i = imag)
+        ```
+        - Bad: 
+        ```py
+        # No spacing with type annotation
+        def complex(real, imag: float=0.0): return Magic(r = real, i = imag)
+        ```
     - Don't use spaces to vertically align tokens on consecutive lines, it becomes a maintenance burden (applies to `:` `#` `=`, etc.)
         - Good:
         ```py
@@ -277,8 +296,9 @@ Decision: encouraged
 
 - Docstrings should be included when they provide additional information. E.g.: providing specifics on how a test should be run or explaining external dependency.
 - Examples of a bad docstring (doesn't provide new info): 
-    - `"""Tests for foo.bar."""`
-    - 
+    ```py
+    """Tests for foo.bar."""
+    ```
     ```py
     def test_foo_is_barred(self):
         """Tests that bar is applied to foo."""
@@ -369,7 +389,7 @@ Decision: encouraged
         """
         ```
 - Logging:
-    - For logging functions that expect a pattern-string (with %-placeholders) as their first argument: Always call them with a string literal (not an f-string!) as their first argument with pattern-parameters as subsequent arguments. Some logging implementations collect the unexpanded pattern-string as a queryable field. It also prevents spending time rendering a message that no logger is configured to output
+    - For logging functions that expect a pattern-string (with %-placeholders) as their first argument: always call them with a string literal (not an f-string!) as their first argument with pattern-parameters as subsequent arguments. Some logging implementations collect the unexpanded pattern-string as a queryable field. It also prevents spending time rendering a message that no logger is configured to output
     - Good:
     ```py
     import os
@@ -521,8 +541,8 @@ def implicit_optional(a: str = None) -> str:
 
 ## Type Aliases
 You can declare aliases of complex types.
-- The name of an alias should be CapWorded. If the alias is used only in this module, it should be _Private.
-- The alias should be type-annotated as typing.TypeAlias, to distinguish it from a non-type global variable.
+- The name of an alias should be CapWorded. If the alias is used only in this module, it should be `_Private`.
+- The alias should be type-annotated as `typing.TypeAlias`, to distinguish it from a non-type global variable.
 - Do not use type aliases as a substitute for the from module import symbol idiom
 
 Good:
@@ -575,6 +595,7 @@ def add(a: AddableType, b: AddableType) -> AddableType:
 A type variable must have a descriptive name, unless it meets all of the following criteria:
 - not externally visible
 - not constrained
+
 Good:
 ```py
 _T = TypeVar("_T")
@@ -592,6 +613,7 @@ _F = TypeVar("_F", bound=Callable)
 
 ## Annotating
 When annotating function signatures, prefer abstract container types like `collections.abc.Sequence` over concrete types like `list`. If you need to use a concrete type (for example, a `tuple` of typed elements), prefer built-in types like `tuple` over the parametric type aliases from the `typing` module (e.g., `typing.Tuple`).
+
 Bad:
 ```py
 from typing import List, Tuple
@@ -640,4 +662,4 @@ def get_names(employee_ids: Sequence[_T]) -> Mapping[_T, str]:
 ## Conclusion
 Be consistent!!
 
-If you’re editing code, take a few minutes to look at the code around you and determine its style. If they use _idx suffixes in index variable names, you should too. If their comments have little boxes of hash marks around them, make your comments have little boxes of hash marks around them too.
+If you’re editing code, look at the code around it and determine its style. If it uses _idx suffixes in index variable names, you should too. If comments have little boxes of hash marks around them, make your comments have little boxes of hash marks around them too.
