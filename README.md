@@ -30,20 +30,20 @@ agentic setups, agent-ready repositories, and agentic code review.
 CLAUDE.md                          # Root always-on context scaffold
 .claude/
   agents/                          # Specialized review subagents
-    correctness-reviewer.md
-    security-reviewer.md
-    architecture-reviewer.md
-    code-quality-reviewer.md
-    performance-reviewer.md
-    test-reviewer.md
+    ...
     README.md                      # How the review agents compose
   rules/
     commenting-standards.md        # Hard, path-scoped commenting rules (Python example)
+    ...
   skills/
     review.md                      # Orchestrates the review agents end to end
     readiness-report.md            # Assesses and improves agent-readiness
+    ...
 docs/
   notes.md                         # Source notes this repo distills
+  pre-commit-hooks.md              # Useful pre-commit hooks to enforce conventions
+  google-style-guide.md            # my notes from Google's Python style guide
+  ... 
 ```
 
 - **[CLAUDE.md](CLAUDE.md)** — the root, always-loaded project context
