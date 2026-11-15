@@ -405,7 +405,8 @@ Seven ways to customize Claude:
 	- Provide more deterministic control over Claude's behavior by firing on specific events in Claude's lifecycle like file edits, tool calls, or session start. 
 	- Types: command, HTTP, mcp_tool, prompt, and agent. The first three execute deterministically, latter two use Claude's judgment rather than a set of rules.
 	- Low context cost because the configuration lives outside the main context window. The harness runs the handler (deterministic hook types) or makes model calls with separate windows.
-    - Example: run scoped tests after every task completed in checklist (TaskCompleted), lint on every edit (PostToolUse), run all tests on tasklist completion (Stop). 
+    - Example: run scoped tests after every task completed in checklist (TaskCompleted), lint on every edit (PostToolUse), run all tests on tasklist completion (Stop).
+        - Hook scripts that exit with code 1 get marked as completed by Claude (whether they pass or fail); code 2 means Claude should go back and fix before continuing.   
 	- Tip: use hooks for anything that should happen deterministically: running liters, posting to Slack on completion, blocking specific commands (rm rf) before the execute. 
 - Output stypes/System-prompt appends: global changes
 	- Files in .claude/output-styles/ that inject instructions into the system prompt.
