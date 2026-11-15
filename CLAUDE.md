@@ -49,10 +49,11 @@ architecture style, and its primary stack.
 
 ## Conventions
 
+- `REPLACE_ME`: Ideally link a `docs/engineering-standards/` folder that contains your standards for the project.
 - Match existing patterns before introducing new ones.
 - Keep changes scoped to the requested task; avoid unrelated refactors.
 - Prefer existing utilities and dependencies over adding new ones.
-- REPLACE_ME: language/stack-specific norms that aren't obvious from reading
+- `REPLACE_ME`: language/stack-specific norms that aren't obvious from reading
   the code (e.g. "Python 3.x only", "Vite, not Create React App", naming
   conventions, error-handling patterns).
 
