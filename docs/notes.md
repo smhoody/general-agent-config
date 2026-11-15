@@ -45,6 +45,188 @@ Best practices:
 - Progressive dislosure: reference specific files as need with additional context, modularize and compose skills
 - Maintain a verification skill to have an agent check its work
 
+From [agentskills.io](https://agentskills.io/skill-creation/best-practices):
+
+### Refine execution
+The first draft of a skill usually needs refinement. Run the skill against real tasks, then feed the results — all of them, not just failures — back into the creation process. Ask: what triggered false positives? What was missed? What could be cut?
+
+**Read agent execution traces**, not just final outputs. If the agent wastes time on unproductive steps, common causes include **instructions that are too vague** (the agent tries several approaches before finding one that works), instructions that don’t apply to the current task (the agent follows them anyway), or too many options presented without a clear default.
+
+### Using context wisely
+Deciding what a skill should cover is like deciding what a function should do: you want it to encapsulate a coherent unit of work that composes well with other skills. 
+- Skills scoped too narrowly force multiple skills to load for a single task, risking overhead and conflicting instructions. 
+- Skills scoped too broadly become hard to activate precisely.
+
+Overly comprehensive skills can hurt more than they help — the agent struggles to extract what’s relevant and may pursue unproductive paths triggered by instructions that don’t apply to the current task. Concise, stepwise guidance with a working example tends to outperform exhaustive documentation. When you find yourself covering every edge case, consider whether most are better handled by the agent’s own judgment.
+
+**Recommended to keep skills under __500 lines and 5,000 tokens__**
+
+When a skill legitimately needs more content, move detailed reference material to separate files in `references/` or similar directories.
+
+### Calibrating control
+**Give the agent freedom** when multiple approaches are valid and the task tolerates variation. 
+
+For flexible instructions, explaining why can be more effective than rigid directives — an agent that understands the purpose behind an instruction makes better context-dependent decisions. A code review skill can describe what to look for without prescribing exact steps:
+```md
+## Code review process
+
+1. Check all database queries for SQL injection (use parameterized queries)
+2. Verify authentication checks on every endpoint
+3. Look for race conditions in concurrent code paths
+4. Confirm error messages don't leak internal details
+```
+
+**Be prescriptive** when operations are fragile, consistency matters, or a specific sequence must be followed:
+```md
+## Database migration
+
+Run exactly this sequence:
+
+```bash
+python scripts/migrate.py --verify --backup
+```
+
+Do not modify the command or add additional flags.
+```
+
+A skill should teach the agent *how to approach* a class of problems, not *what to produce* for a specific instance. Compare:
+```md
+<!--> Specific answer — only useful for this exact task -->
+Join the `orders` table to `customers` on `customer_id`, filter where
+`region = 'EMEA'`, and sum the `amount` column.
+
+<!-- Reusable method — works for any analytical query -->
+1. Read the schema from `references/schema.yaml` to find relevant tables
+2. Join tables using the `_id` foreign key convention
+3. Apply any filters from the user's request as WHERE clauses
+4. Aggregate numeric columns as needed and format as a markdown table
+```
+
+### Patterns for effective instructions
+- Gotcha sections: contain environment-specific facts that defy reasonable assumptions. 
+    - Example:
+    ```md
+    ## Gotchas
+    - The `users` table uses soft deletes. Queries must include
+    `WHERE deleted_at IS NULL` or results will include deactivated accounts.
+    - The user ID is `user_id` in the database, `uid` in the auth service,
+    and `accountId` in the billing API. All three refer to the same value.
+    - The `/health` endpoint returns 200 as long as the web server is running,
+    even if the database connection is down. Use `/ready` to check full
+    service health.
+    ```
+    - Keep gotchas in SKILL.md where the agent reads them before encountering the situation. A separate reference file works if you tell the agent when to load it, but for non-obvious issues, the agent may not recognize the trigger.
+
+- Output templates: when you need an agent to produce output in a specific format.
+    - Short templates can live inline in the `SKILL.md`, longer templates (or templates only needed in certain cases) should be stored in `assets/` and reference them from `SKILL.md` so they only load when needed.
+    - Example:
+    ```md
+    ## Report structure
+    Use this template, adapting sections as needed for the specific analysis:
+
+    ```markdown
+    # [Analysis Title]
+
+    ## Executive summary
+    [One-paragraph overview of key findings]
+
+    ## Key findings
+    - Finding 1 with supporting data
+    - Finding 2 with supporting data
+
+    ## Recommendations
+    1. Specific actionable recommendation
+    2. Specific actionable recommendation
+    ```
+
+- Checklists for multi-step workflows: helps the agent track progress and avoid skipping steps, especially when steps have dependencies or validation gates.
+    - Example:
+    ```md
+    ## Form processing workflow
+
+    Progress:
+    - [ ] Step 1: Analyze the form (run `scripts/analyze_form.py`)
+    - [ ] Step 2: Create field mapping (edit `fields.json`)
+    - [ ] Step 3: Validate mapping (run `scripts/validate_fields.py`)
+    - [ ] Step 4: Fill the form (run `scripts/fill_form.py`)
+    - [ ] Step 5: Verify output (run `scripts/verify_output.py`)
+    ```
+
+- Validation loops: validate the agent's own work before moving on.
+    - The pattern is: 
+        - Do work
+        - Run a validator (script, reference checklist, self-check)
+        - Fix any issues
+        - Repeat until validation passes
+    - Example:
+    ```md
+    ## Editing workflow
+
+    1. Make your edits
+    2. Run validation: `python scripts/validate.py output/`
+    3. If validation fails:
+    - Review the error message
+    - Fix the issues
+    - Run validation again
+    4. Only proceed when validation passes
+    ``` 
+
+### Using scripts
+Skills can instruct agents to run shell commands and bundle reusable scripts in a `scripts/` directory. 
+
+When an agent runs your script, it reads stdout and stderr to decide what to do next. A few design choices make scripts dramatically easier for agents to use:
+- Avoid interactive prompts
+    - Example:
+    ```md
+    # Bad: hangs waiting for input
+    $ python scripts/deploy.py
+    Target environment: _
+
+    # Good: clear error with guidance
+    $ python scripts/deploy.py
+    Error: --env is required. Options: development, staging, production.
+    Usage: python scripts/deploy.py --env staging --tag v1.2.3
+    ```
+- Document usage with `--help`: `--help` output is the primary way an agent learns your script’s interface. 
+    - Include a brief description, available flags, and usage examples:
+    ```
+    Usage: scripts/process.py [OPTIONS] INPUT_FILE
+
+    Process input data and produce a summary report.
+
+    Options:
+    --format FORMAT    Output format: json, csv, table (default: json)
+    --output FILE      Write output to FILE instead of stdout
+    --verbose          Print progress to stderr
+
+    Examples:
+    scripts/process.py data.csv
+    scripts/process.py --format csv --output report.csv data.csv
+    ```
+- Write helpful error messages: the message should directly shape the agent's next attempt.
+    - Example:
+    ```
+    Error: --format must be one of: json, csv, table.
+       Received: "xml"
+    ```
+- Use structured output: prefer JSON, CSV, TSV, over free-form text
+    - Example:
+    ```
+    # Whitespace-aligned — hard to parse programmatically
+    NAME          STATUS    CREATED
+    my-service    running   2025-01-15
+
+    # Delimited — unambiguous field boundaries
+    {"name": "my-service", "status": "running", "created": "2025-01-15"}
+    ```
+- Idempotency: Agents may retry commands. “Create if not exists” is safer than “create and fail on duplicate.”
+- Input constraints: Reject ambiguous input with a clear error rather than guessing. Use enums and closed sets where possible.
+- Dry-run support: For destructive or stateful operations, a `--dry-run` flag lets the agent preview what will happen.
+- Meaningful exit codes: Use distinct exit codes for different failure types (not found, invalid arguments, auth failure) and document them in your `--help` output so the agent knows what each code means
+- Safe defaults: Consider whether destructive operations should require explicit confirmation flags (`--confirm`, `--force`) or other safeguards appropriate to the risk level.
+- Predictable output size: Many agent harnesses automatically truncate tool output beyond a threshold (e.g., 10-30K characters), potentially losing critical information. If your script might produce large output, default to a summary or a reasonable limit, and support flags like `--offset` so the agent can request more information when needed. Alternatively, if output is large and not amenable to pagination, require agents to pass an `--output` flag that specifies either an output file or `-` to explicitly opt in to stdout.
+
+
 Popular skills:
 - [Modern Web Guidance](https://github.com/googlechrome/modern-web-guidance): embed web platform expertise, best practices, and browser compatibility data into coding agents.
 - [Skills for Real Engineers](https://github.com/mattpocock/skills): general agent skills from Matt Pocock.
@@ -221,8 +403,9 @@ Seven ways to customize Claude:
 - Hooks: deterministic automation
 	- Registered in settings.json, managed policy settings, or skill/agent frontmatter
 	- Provide more deterministic control over Claude's behavior by firing on specific events in Claude's lifecycle like file edits, tool calls, or session start. 
-	- Types: command, HTTP, mcp_tool, prompt, and agent. The first three execute deterministically, latter two use Claude's judgment rather  than a set of rules
+	- Types: command, HTTP, mcp_tool, prompt, and agent. The first three execute deterministically, latter two use Claude's judgment rather than a set of rules.
 	- Low context cost because the configuration lives outside the main context window. The harness runs the handler (deterministic hook types) or makes model calls with separate windows.
+    - Example: run scoped tests after every task completed in checklist (TaskCompleted), lint on every edit (PostToolUse), run all tests on tasklist completion (Stop). 
 	- Tip: use hooks for anything that should happen deterministically: running liters, posting to Slack on completion, blocking specific commands (rm rf) before the execute. 
 - Output stypes/System-prompt appends: global changes
 	- Files in .claude/output-styles/ that inject instructions into the system prompt.
