@@ -1,4 +1,4 @@
-# Agent-config
+# Agent Configuration and Customization 
 
 A personal, portable collection of scaffolds for **agentic engineering**:
 customizing AI coding agents (Claude Code, Copilot, etc.) and making a
