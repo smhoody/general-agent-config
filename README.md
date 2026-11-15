@@ -90,10 +90,10 @@ docs/
 
 In roughly this order: 
 1. Write a `CLAUDE.md` that explains how to build, test, and run the project in plain language
-2. make sure one command runs the tests.
-3. Add lint/format on commit. 
+2. Have one command to runs the tests
+3. Add lint/format on commit (see [pre-commit notes](docs/pre-commit-hooks.md))
 4. Add a `.env.example` so there's no guessing required configuration
-5. Prefer writing a failing test first so an agent can fix it against a clear target.
+5. Prefer writing a failing test first so an agent can fix it against a clear target
 
 ## Using this repo
 
