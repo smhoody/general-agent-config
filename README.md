@@ -8,7 +8,10 @@ Nothing in here is tied to a specific project. Each file is a generic
 starting point — copy what's relevant into a target repository, fill in
 the `REPLACE_ME` placeholders, and delete what doesn't apply.
 
-All work is based on the materials from the Stanford course [CS146S: The Modern Software Developer](https://themodernsoftware.dev/).
+Sources:
+- [Stanford's CS146S: The Modern Software Developer](https://themodernsoftware.dev/)
+- [Google Style Guide](https://google.github.io/styleguide/pyguide.html)
+- [CockroachDB Repo](https://github.com/cockroachdb/cockroach)
 
 ## Why this exists
 
