@@ -73,7 +73,7 @@ docs/
   - Use skills for anything that's a process (a review
   workflow, a release checklist, a deploy flow) rather than static
   context.
-- **[docs/notes.md](docs/notes.md)** — the underlying research/notes this
+- **[docs/](docs/)** — the underlying research/notes this
   whole repo is distilled from. Treat it as the rationale, and the scaffolds as the implementation.
 
 ## Making a project agent-ready
