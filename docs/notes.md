@@ -45,8 +45,68 @@ Best practices:
 - Progressive dislosure: reference specific files as need with additional context, modularize and compose skills
 - Maintain a verification skill to have an agent check its work
 
-From [agentskills.io](https://agentskills.io/skill-creation/best-practices):
+From [Claude Code Docs](https://code.claude.com/docs/en/skills):
 
+### Frontmatter types
+| Field | Description |
+|---|---|
+| name | Command name shown in the `/` menu |
+| description | What the skill does and when to use this. Claude uses this to decide when to apply the skill |
+| when_to_use | Additional context for when Claude should invoke the skill, such as trigger phrases or example requests |
+| arguments | Named positional arguments for `$name substitution` in the skill content. Accepts a space-separated string or a YAML list |
+| disable-model-invocation | When set to `true`, it prevents Claude from automatically loading this skill |
+| user-invocable | Set to `false` when only Claude should invoke the skill (Claude Code hides it from the `/` menu) |
+| allowed-tools | Tools Claude can use without asking permission during the turn that involves this skill |
+| disallowed-tools | Tools removed from Claude's available pool while this skill is active (e.g. `AskUserQuestion`) |
+| model | Model to use for this skill. Override applies for the rest of the current turn and resumes to session model when complete |
+| effort | Effort level for the rest of the turn. Options: `low`, `medium`, `high`, `xhigh`, `max` |
+| context | Set to `fork` to run in a forked subagent context |
+| background | Only applies with `context: fork`. Set to `false` to wait for the forked subagent's result in the turn that invoked the skill, instead of running it in the background. Default: `true` |
+| paths | Glob patterns that limit when this skill is activated. When set, Claude loads the skill automatically only when working with files matching the patterns. |
+
+Skill example:
+```yml
+---
+name: deploy
+description: Deploy the application to production
+context: fork # runs the skill in its own subagent context
+disable-model-invocation: true # prevents Claude from triggering this skill automatically (can only be run manually: /deploy)
+allowed-tools: Bash(git add *) Bash(git commit *) Bash(git status *)
+model: claude-opus-5-5
+effort: medium
+hooks:
+  PreToolUse:
+    - matcher: "Bash"
+      hooks:
+        - type: command
+          command: '"${CLAUDE_PROJECT_DIR}"/scripts/security-check.sh' # runs security validation script before each Bash cmd
+---
+
+Deploy the application:
+1. Run the test suite
+2. Build the application
+3. Push to the deployment target
+```
+
+### Supporting files
+```
+my-skill/
+├── SKILL.md (required - overview and navigation)
+├── reference.md (detailed API docs - loaded when needed)
+├── examples.md (usage examples - loaded when needed)
+└── scripts/
+    └── helper.py (utility script - executed, not loaded)
+```
+Reference supporting files from SKILL.md so Claude knows what each file contains and when to load it:
+```md
+## Additional resources
+
+- For complete API details, see [reference.md](reference.md)
+- For usage examples, see [examples.md](examples.md)
+```
+
+
+From [agentskills.io](https://agentskills.io/skill-creation/best-practices):
 ### Refine execution
 The first draft of a skill usually needs refinement. Run the skill against real tasks, then feed the results — all of them, not just failures — back into the creation process. Ask: what triggered false positives? What was missed? What could be cut?
 
@@ -101,6 +161,7 @@ Join the `orders` table to `customers` on `customer_id`, filter where
 3. Apply any filters from the user's request as WHERE clauses
 4. Aggregate numeric columns as needed and format as a markdown table
 ```
+
 
 ### Patterns for effective instructions
 - Gotcha sections: contain environment-specific facts that defy reasonable assumptions. 
@@ -171,6 +232,28 @@ Join the `orders` table to `customers` on `customer_id`, filter where
     4. Only proceed when validation passes
     ``` 
 
+
+### Effective descriptions
+Principles:
+- Use imperative phrasing: frame the description as an instruction to the agent: "Use this skill when..." rather than "This skill does..." The agent is deciding whether to act, so tell it when to act.
+- Focus on user intent, not implementation: descript what the user is trying to achieve, not the skill's internal mechanics. The agent matches against what the user asked for.
+- Err on the side of being pushy: explicitly list contexts where the skill applies, including cases where the user doesn't name the domain directly: "even if they don't explicitly mention 'CSV' or 'analysis.'"
+- Keep it concise: a few sentences to a short paragraph is usually right -- long enough to cover the skill's scope, short enough that it doesn't bloat the agent's context across many skills. Limit to 1024 characters.
+
+```yml
+# Bad
+description: Process CSV files.
+
+# Good
+description: >
+  Analyze CSV and tabular data files — compute summary statistics,
+  add derived columns, generate charts, and clean messy data. Use this
+  skill when the user has a CSV, TSV, or Excel file and wants to
+  explore, transform, or visualize the data, even if they don't
+  explicitly mention "CSV" or "analysis."
+```
+
+
 ### Using scripts
 Skills can instruct agents to run shell commands and bundle reusable scripts in a `scripts/` directory. 
 
@@ -227,7 +310,209 @@ When an agent runs your script, it reads stdout and stderr to decide what to do 
 - Predictable output size: Many agent harnesses automatically truncate tool output beyond a threshold (e.g., 10-30K characters), potentially losing critical information. If your script might produce large output, default to a summary or a reasonable limit, and support flags like `--offset` so the agent can request more information when needed. Alternatively, if output is large and not amenable to pagination, require agents to pass an `--output` flag that specifies either an output file or `-` to explicitly opt in to stdout.
 
 
-Popular skills:
+### Evaluating skills
+Creating a skill and having it work doesn't validate its existence, the model could actually perform better without the skill.
+
+Running evaluations on skills helps showcase whether the skill works reliably across varied prompts, in edge cases, and against no skill.
+
+Creating a test case:
+- Prompt: a realistic user message, something you would type.
+- Expected output: a human-readable description of what success looks like.
+- Input files (optional): files the skill needs to work with.
+
+Store test cases in `evals/evals.json` inside your skill directory:
+```json
+{
+  "skill_name": "csv-analyzer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a CSV of monthly sales data in data/sales_2025.csv. Can you find the top 3 months by revenue and make a bar chart?",
+      "expected_output": "A bar chart image showing the top 3 months by revenue, with labeled axes and values.",
+      "files": ["evals/files/sales_2025.csv"]
+    },
+    {
+      "id": 2,
+      "prompt": "there's a csv in my downloads called customers.csv, some rows have missing emails — can you clean it up and tell me how many were missing?",
+      "expected_output": "A cleaned CSV with missing emails handled, plus a count of how many were missing.",
+      "files": ["evals/files/customers.csv"]
+    }
+  ]
+}
+```
+Writing good test prompts:
+- Start with 2-3 test cases: dont over-invest before you've seen your first round of results; expand later.
+- Vary the prompts: use different phrasings, levels of detail, and formality (e.g. "clean up this csv", and "parse the CSV at /path/to/csv, drop rows here columb B is null, and write the result to /output/path").
+- Cover edge cases: include at least one prompt that tests a boundary condition: a malformed input, unusual request, or a case where the skill's instructions might be ambiguous.
+- Use realistic context: real users mention file paths, column names, and personal context. Prompts like "process this data" are too vague to test anything useful.
+
+**Core pattern -- run each test case twice:**
+- Once with the skill
+- Once without the skill (or a previous version)
+
+Structure:
+```
+csv-analyzer/
+├── SKILL.md
+└── evals/
+    └── evals.json
+csv-analyzer-workspace/
+└── iteration-1/
+    ├── eval-top-months-chart/
+    │   ├── with_skill/
+    │   │   ├── outputs/       # Files produced by the run
+    │   │   ├── timing.json    # Tokens and duration
+    │   │   └── grading.json   # Assertion results
+    │   └── without_skill/
+    │       ├── outputs/
+    │       ├── timing.json
+    │       └── grading.json
+    ├── eval-clean-missing-emails/
+    │   ├── with_skill/
+    │   │   ├── outputs/
+    │   │   ├── timing.json
+    │   │   └── grading.json
+    │   └── without_skill/
+    │       ├── outputs/
+    │       ├── timing.json
+    │       └── grading.json
+    └── benchmark.json         # Aggregated statistics
+```
+The file you author by hand is `evals/evals.json`. Everything else is produced during the eval process (by agent or scripts).
+
+**Eval runs**:
+- Should start with a clean context. This ensures the agent follows only what the `SKILL.md` tells it.
+- Provide:
+    - Skill path (or no skill for the baseline)
+    - Test prompt
+    - Any input files
+    - Output directory
+- Example of instructions for a single with-skill run:
+    ```
+    Execute this task:
+    - Skill path: /path/to/csv-analyzer
+    - Task: I have a CSV of monthly sales data in data/sales_2025.csv.
+    Can you find the top 3 months by revenue and make a bar chart?
+    - Input files: evals/files/sales_2025.csv
+    - Save outputs to: csv-analyzer-workspace/iteration-1/eval-top-months-chart/with_skill/outputs/
+    ```
+    - Use the same prompt but without the skill path when testing no skill and saving to `without_skill/outputs/`.
+
+**Capture timing data**: when Claude finishes a task, the task completion notification includes `total_tokens` and `duration_ms`. Save those values to the output
+
+Writing assertions: verifiable statements about what the output should contain or achieve.
+- Add after seeing the first round of outputs; you often don't know what "good" looks like until after the skill has run.
+- Good assertions:
+    - "The output file is valid JSON" - verifiable
+    - "The bar chart has labeled axes" - specific and observable
+    - "The report includes at least 3 recommendations" - countable
+- Bad assertions:
+    - "The output is good": too vague
+    - "The output uses exactly the phrase 'Total Revenue: $X'" - too briddle; correct output with different wording would fail.
+- Not everything needs an assertion. Some qualities (writing style, visual design, whether the output feels right) are hard to decompose into pass/fail checks. These are better caught during human review. Reserve assertions for things that can be checked objectively.
+
+Assertions for a test case in `evals/evals.json`:
+```json
+{
+  "skill_name": "csv-analyzer",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I have a CSV of monthly sales data in data/sales_2025.csv. Can you find the top 3 months by revenue and make a bar chart?",
+      "expected_output": "A bar chart image showing the top 3 months by revenue, with labeled axes and values.",
+      "files": ["evals/files/sales_2025.csv"],
+      "assertions": [
+        "The output includes a bar chart image file",
+        "The chart shows exactly 3 months",
+        "Both axes are labeled",
+        "The chart title or caption mentions revenue"
+      ]
+    }
+  ]
+}
+```
+
+Grading outputs: evaluate each assertion against the actual outputs and record PASS or FAIL with specific evidence.
+- Simple approach: give the outputs and assertions to an agent and ask it to evaluate each one.
+    - Assertions that can be checked by code should use a verification script because they're deterministic
+    - Grading principles:
+        - **Require concrete evidence for a pass.** Don’t give the benefit of the doubt. If an assertion says “includes a summary” and the output has a section titled “Summary” with one vague sentence, that’s a FAIL — the label is there but the substance isn’t.
+        - **Review the assertions themselves, not just the results.** While grading, notice when assertions are too easy (always pass regardless of skill quality), too hard (always fail even when the output is good), or unverifiable (can’t be checked from the output alone). Fix these for the next iteration.
+    - Tip: for comparing skill versions, do a blind comparison by not revealing which skill came from which version. 
+    - `grading.json` example:
+        ```json
+        {
+            "assertion_results": [
+                {
+                "text": "The output includes a bar chart image file",
+                "passed": true,
+                "evidence": "Found chart.png (45KB) in outputs directory"
+                },
+                {
+                "text": "The chart shows exactly 3 months",
+                "passed": true,
+                "evidence": "Chart displays bars for March, July, and November"
+                },
+                {
+                "text": "Both axes are labeled",
+                "passed": false,
+                "evidence": "Y-axis is labeled 'Revenue ($)' but X-axis has no label"
+                },
+                {
+                "text": "The chart title or caption mentions revenue",
+                "passed": true,
+                "evidence": "Chart title reads 'Top 3 Months by Revenue'"
+                }
+            ],
+            "summary": {
+                "passed": 3,
+                "failed": 1,
+                "total": 4,
+                "pass_rate": 0.75
+            }
+        }
+        ```
+
+Aggregating results:
+- Once every run in the iteration is graded, compute summary stats per config and save them to `benchmark.json` alongside the eval directories (e.g. `csv-analyzer-workspace/iter-1/benchmark.json`)
+- Example:
+    ```json
+    {
+        "run_summary": {
+            "with_skill": {
+                "pass_rate": { "mean": 0.83, "stddev": 0.06 },
+                "time_seconds": { "mean": 45.0, "stddev": 12.0 },
+                "tokens": { "mean": 3800, "stddev": 400 }
+            },
+            "without_skill": {
+                "pass_rate": { "mean": 0.33, "stddev": 0.10 },
+                "time_seconds": { "mean": 32.0, "stddev": 8.0 },
+                "tokens": { "mean": 2100, "stddev": 300 }
+            },
+            "delta": {
+                "pass_rate": 0.50,
+                "time_seconds": 13.0,
+                "tokens": 1700
+            }
+        }
+    }
+    ```
+    - `delta` tells you what the skill costs (more time, more tokens) and what it buys (higher pass rate). A skill that adds 13 seconds but improves pass rate by 50% is probably worth it. A skill that doubles token usage for 2% improvement might not be.
+
+Iterating on a skill:
+- After grading and reviewing, you have 3 sources of signal:
+    - **Failed assertions** point to specific gaps: a missing step, unclear instruction, or a case the skill doesn't handle
+    - **Human feedback** points to borader quality issues: approach was wrong, output was poorly structured, skill produced a technically correct but unhelpful result.
+    - **Execution transcripts** reveal why things went wrong: if the agent spent time on unproductive steps, those instructions may need to be simplified or removed.
+
+The most effective way to turn these signals into skill improvements is to give all three — along with the current SKILL.md — to an LLM and ask it to propose changes. The LLM can synthesize patterns across failed assertions, reviewer complaints, and transcript behavior that would be tedious to connect manually. When prompting the LLM, include these guidelines:
+- **Generalize from feedback.** The skill will be used across many different prompts, not just the test cases. Fixes should address underlying issues broadly rather than adding narrow patches for specific examples.
+- **Keep the skill lean.** Fewer, better instructions often outperform exhaustive rules. If transcripts show wasted work (unnecessary validation, unneeded intermediate outputs), remove those instructions. If pass rates plateau despite adding more rules, the skill may be over-constrained — try removing instructions and see if results hold or improve.
+- **Explain the why.** Reasoning-based instructions (“Do X because Y tends to cause Z”) work better than rigid directives (“ALWAYS do X, NEVER do Y”). Models follow instructions more reliably when they understand the purpose.
+- **Bundle repeated work.** If every test run independently wrote a similar helper script (a chart builder, a data parser), that’s a signal to bundle the script into the skill’s scripts/ directory.
+
+
+**Popular community skills**:
 - [Modern Web Guidance](https://github.com/googlechrome/modern-web-guidance): embed web platform expertise, best practices, and browser compatibility data into coding agents.
 - [Skills for Real Engineers](https://github.com/mattpocock/skills): general agent skills from Matt Pocock.
 - [Ponytail](https://github.com/dietrichgebert/ponytail): reduces amount of code and token usage, provides senior-dev level reviews.
